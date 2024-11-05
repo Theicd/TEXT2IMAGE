@@ -1,0 +1,480 @@
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;700&display=swap');
+
+:root {
+    --primary-color: #4CAF50;
+    --secondary-color: #45a049;
+    --background-color: #1a1a1a;
+    --surface-color: #2a2a2a;
+    --on-surface-color: #ffffff;
+    --text-color: #ffffff;
+    --error-color: #f44336;
+}
+
+body {
+    font-family: 'Heebo', sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    margin: 0;
+    padding: 0;
+    direction: rtl;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 2rem;
+    background-color: var(--surface-color);
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+}
+
+.logo svg {
+    width: 2rem;
+    height: 2rem;
+    margin-left: 0.5rem;
+}
+
+.logo span {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.header-buttons {
+    display: flex;
+    align-items: center;
+}
+
+button {
+    margin-right: 1rem;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+}
+
+.ghost-button {
+    background-color: transparent;
+    color: var(--on-surface-color);
+    border: 1px solid var(--on-surface-color);
+}
+
+.ghost-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.secondary-button {
+    background-color: var(--surface-color);
+    color: var(--on-surface-color);
+}
+
+.secondary-button:hover {
+    background-color: #3a3a3a;
+}
+
+.icon {
+    width: 1.5rem;
+    height: 1.5rem;
+    margin-right: 1rem;
+    cursor: pointer;
+}
+
+main {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 2rem;
+}
+
+h1, h2, h3, h4 {
+    color: var(--primary-color);
+}
+
+.input-container {
+    display: flex;
+    margin-bottom: 2rem;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"] {
+    flex-grow: 1;
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+    border: none;
+    border-radius: 4px;
+    background-color: var(--surface-color);
+    color: var(--on-surface-color);
+}
+
+input:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--primary-color);
+}
+
+#generateButton {
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 0 4px 4px 0;
+    cursor: pointer;
+}
+
+#generateButton:hover {
+    background-color: var(--secondary-color);
+}
+
+.image-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.image-card {
+    background-color: var(--surface-color);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: transform 0.3s ease-in-out;
+}
+
+.image-card:hover {
+    transform: scale(1.05);
+}
+
+.image-card img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+}
+
+.image-card p {
+    padding: 0.5rem;
+    margin: 0;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.4);
+    animation: fadeIn 0.3s;
+}
+
+.modal-content {
+    background-color: var(--surface-color);
+    margin: 15% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    max-width: 500px;
+    border-radius: 8px;
+}
+
+.close {
+    color: #aaa;
+    float: left;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close:hover,
+.close:focus {
+    color: #fff;
+    text-decoration: none;
+}
+
+.auth-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+}
+
+.auth-tabs {
+    display: flex;
+    margin-bottom: 20px;
+}
+
+.auth-tab {
+    padding: 10px 20px;
+    border: none;
+    background-color: transparent;
+    cursor: pointer;
+    font-size: 16px;
+    color: #aaa;
+    transition: color 0.3s;
+}
+
+.auth-tab.active {
+    color: var(--primary-color);
+    border-bottom: 2px solid var(--primary-color);
+}
+
+#loginForm, #authForm {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 300px;
+}
+
+#loginForm input, #authForm input {
+    margin-bottom: 10px;
+}
+
+.social-auth {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    max-width: 300px;
+}
+
+#googleAuth, #facebookAuth {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    color: white;
+    transition: opacity 0.3s;
+}
+
+#googleAuth {
+    background-color: #DB4437;
+}
+
+#facebookAuth {
+    background-color: #4267B2;
+}
+
+#googleAuth:hover, #facebookAuth:hover {
+    opacity: 0.9;
+}
+
+#googleAuth img, #facebookAuth img {
+    width: 20px;
+    height: 20px;
+    margin-right: 10px;
+}
+
+#logoutBtn {
+    background-color: var(--error-color);
+    color: white;
+}
+
+#logoutBtn:hover {
+    opacity: 0.9;
+}
+
+#userDashboard, #adminDashboard {
+    background-color: var(--surface-color);
+    padding: 20px;
+    border-radius: 8px;
+    margin-top: 20px;
+    animation: fadeIn 0.5s;
+}
+
+#creditBalance {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+#availableModels {
+    list-style-type: none;
+    padding: 0;
+}
+
+#availableModels li {
+    background-color: #3a3a3a;
+    margin-bottom: 10px;
+    padding: 10px;
+    border-radius: 4px;
+}
+
+#adminStats {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 20px;
+}
+
+#adminStats p {
+    background-color: #3a3a3a;
+    padding: 10px;
+    border-radius: 4px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+}
+
+th, td {
+    text-align: right;
+    padding: 10px;
+    border-bottom: 1px solid #4a4a4a;
+}
+
+th {
+    background-color: #3a3a3a;
+}
+
+#creditManagement, #creditConversion, #analytics {
+    background-color: #3a3a3a;
+    padding: 15px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+#creditManagement input, 
+#creditConversion input, 
+#analytics input {
+    margin-right: 10px;
+    padding: 5px;
+    border-radius: 4px;
+    border: none;
+}
+
+#updateCreditValue, 
+#updateConversionRateBtn, 
+#calculateCreditsBtn, 
+#addPromoBtn, 
+#generateReportBtn {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+#updateCreditValue:hover, 
+#updateConversionRateBtn:hover, 
+#calculateCreditsBtn:hover, 
+#addPromoBtn:hover, 
+#generateReportBtn:hover {
+    background-color: var(--secondary-color);
+}
+
+#promoList {
+    list-style-type: none;
+    padding: 0;
+}
+
+#promoList li {
+    background-color: #4a4a4a;
+    margin-bottom: 10px;
+    padding: 10px;
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#promoList button {
+    background-color: var(--error-color);
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#reportContainer {
+    background-color: #4a4a4a;
+    padding: 15px;
+    border-radius: 4px;
+    margin-top: 10px;
+}
+
+.delete-button {
+    background-color: var(--error-color);
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.delete-button:hover {
+    opacity: 0.9;
+}
+
+.home-button {
+    background-color: var(--secondary-color);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    margin-bottom: 20px;
+    transition: background-color 0.3s;
+}
+
+.home-button:hover {
+    background-color: var(--primary-color);
+}
+
+.save-button {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    margin-top: 20px;
+    transition: background-color 0.3s;
+}
+
+.save-button:hover {
+    background-color: var(--secondary-color);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@media (max-width: 768px) {
+    #adminStats {
+        flex-direction: column;
+    }
+
+    #adminStats p {
+        margin-bottom: 10px;
+    }
+
+    table {
+        font-size: 0.9em;
+    }
+
+    .header-buttons {
+        flex-wrap: wrap;
+    }
+
+    .header-buttons button {
+        margin-bottom: 0.5rem;
+    }
+}
