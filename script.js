@@ -54,8 +54,8 @@ async function generateImage() {
         return;
     }
 
-    const prompt = promptInput.value;
-    if (prompt.trim() === '') {
+    const prompt = promptInput.value.trim();
+    if (prompt === '') {
         console.log('תיאור תמונה ריק');
         alert('אנא הזן תיאור לתמונה');
         return;
@@ -87,35 +87,52 @@ async function generateImage() {
 
     try {
         console.log('מתחיל ליצור תמונה');
-        
-        // קריאה לפונקציית יצירת התמונה
-        console.log('שולח בקשה ל-OpenAI');
-        const imageUrl = await generateImageWithOpenAI(prompt);
-        console.log('התקבלה תשובה מ-OpenAI:', imageUrl);
 
-        // חיוב הקרדיטים רק לאחר שהתמונה נוצרה בהצלחה
-        if (updateUserCredits(-cost)) {
-            const creditAction = `יצירת תמונה: ${prompt}`;
-            if (logCreditUsage(creditAction, -cost, true)) {
-                // יצירת אלמנטים חדשים לתמונה
-                const imageCard = document.createElement('div');
-                imageCard.className = 'image-card';
-                
-                const img = document.createElement('img');
-                img.src = imageUrl;
-                img.alt = prompt;
-                
-                const p = document.createElement('p');
-                p.textContent = prompt;
-                
-                imageCard.appendChild(img);
-                imageCard.appendChild(p);
-                
-                imageGrid.prepend(imageCard);
-                promptInput.value = '';
-                updateGenerateButtonText(); // עדכון הכפתור אחרי השימוש
-                alert('התמונה נוצרה בהצלחה!');
+        // קריאה לפונקציית serverless שנמצאת ב-Vercel (api/generateImage)
+        console.log('שולח בקשה ל-OpenAI דרך פונקציית צד שרת');
+        const response = await fetch('/api/generateImage', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ prompt })
+        });
+
+        if (!response.ok) {
+            throw new Error('שגיאה בקריאה לפונקציה צד שרת');
+        }
+
+        const data = await response.json();
+        if (data.data && data.data[0] && data.data[0].url) {
+            const imageUrl = data.data[0].url;
+            console.log('התקבלה תמונה:', imageUrl);
+
+            // חיוב הקרדיטים רק לאחר שהתמונה נוצרה בהצלחה
+            if (updateUserCredits(-cost)) {
+                const creditAction = `יצירת תמונה: ${prompt}`;
+                if (logCreditUsage(creditAction, -cost, true)) {
+                    // יצירת אלמנטים חדשים לתמונה
+                    const imageCard = document.createElement('div');
+                    imageCard.className = 'image-card';
+
+                    const img = document.createElement('img');
+                    img.src = imageUrl;
+                    img.alt = prompt;
+
+                    const p = document.createElement('p');
+                    p.textContent = prompt;
+
+                    imageCard.appendChild(img);
+                    imageCard.appendChild(p);
+
+                    imageGrid.prepend(imageCard);
+                    promptInput.value = '';
+                    updateGenerateButtonText(); // עדכון הכפתור אחרי השימוש
+                    alert('התמונה נוצרה בהצלחה!');
+                }
             }
+        } else {
+            throw new Error('לא התקבל URL לתמונה');
         }
     } catch (error) {
         console.error('שגיאה ביצירת תמונה:', error);
@@ -194,7 +211,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // הגדרת אירועי לחיצה
     const generateButton = document.getElementById('generateButton');
-    const promptInput = document.getElementById('promptInput');
     const authBtn = document.getElementById('authBtn');
     const logoutBtn = document.getElementById('logoutBtn');
     const dashboardBtn = document.getElementById('dashboardBtn');
