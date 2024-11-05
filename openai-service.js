@@ -1,7 +1,7 @@
 // openai-service.js
 
 const OPENAI_API_ENDPOINT = 'https://api.openai.com/v1/images/generations';
-const OPENAI_API_KEY = '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';
+const OPENAI_API_KEY = '';
 
 async function generateImageWithOpenAI(prompt) {
     console.log('התחלת קריאה ל-OpenAI');
