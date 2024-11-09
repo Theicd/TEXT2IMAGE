@@ -1,36 +1,23 @@
-// openai-service.js
-
-const OPENAI_API_ENDPOINT = 'https://api.openai.com/v1/images/generations';
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-
-async function generateImageWithOpenAI(prompt) {
-    console.log('התחלת קריאה ל-OpenAI');
-    
-    const requestBody = {
-        model: "dall-e-3",
-        prompt: prompt,
-        size: "1024x1024",
-        n: 1
-    };
+async function generateImage(prompt) {
+    console.log('התחלת תהליך יצירת תמונה');
 
     try {
-        // שליחת הבקשה ל-OpenAI
-        const response = await fetch(OPENAI_API_ENDPOINT, {
+        // קריאה לפונקציית serverless בשרת שלנו
+        const response = await fetch('/api/generateImage', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${OPENAI_API_KEY}`
+                'Content-Type': 'application/json'
             },
-            body: JSON.stringify(requestBody)
+            body: JSON.stringify({ prompt })
         });
 
-        console.log('התקבלה תשובה מ-OpenAI:', response.status);
+        console.log('התקבלה תשובה מהשרת:', response.status);
 
         // בדיקת שגיאות
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('שגיאת API:', errorText);
-            throw new Error('שגיאה בקריאה ל-OpenAI API');
+            console.error('שגיאת שרת:', errorText);
+            throw new Error('שגיאה בקריאה לפונקציה צד שרת');
         }
 
         // קריאת התשובה
@@ -46,10 +33,10 @@ async function generateImageWithOpenAI(prompt) {
         return data.data[0].url;
 
     } catch (error) {
-        console.error('שגיאה:', error);
+        console.error('שגיאה ביצירת תמונה:', error);
         throw error;
     }
 }
 
 // חשיפת הפונקציה לחלון הגלובלי
-window.generateImageWithOpenAI = generateImageWithOpenAI;
+window.generateImage = generateImage;
