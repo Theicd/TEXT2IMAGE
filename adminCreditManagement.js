@@ -1,4 +1,4 @@
-// קובץ: adminCreditManagement.js
+// adminCreditManagement.js
 let creditConversionRate = 50;
 let services = [
     {
@@ -26,6 +26,31 @@ let services = [
 ];
 let promos = [];
 
+// מטפל בטעינת נתונים ראשונית
+async function initializeAdminData() {
+    try {
+        await loadDataFromDb();
+    } catch (error) {
+        console.error('Failed to load data from DB, using local storage:', error);
+        loadDataFromStorage();
+    }
+}
+
+// טוען נתונים מהשרת
+async function loadDataFromDb() {
+    const response = await fetch('/api/admin/settings');
+    if (!response.ok) throw new Error('Failed to load settings');
+    
+    const data = await response.json();
+    creditConversionRate = data.creditConversionRate || 50;
+    services = data.services || services;
+    promos = data.promos || [];
+    
+    saveDataToStorage(); // גיבוי מקומי
+    return data;
+}
+
+// טוען נתונים מאחסון מקומי
 function loadDataFromStorage() {
     const savedData = localStorage.getItem('adminData');
     if (savedData) {
@@ -37,98 +62,157 @@ function loadDataFromStorage() {
     saveDataToStorage();
 }
 
-function saveDataToStorage() {
-    const dataToSave = {
-        creditConversionRate: creditConversionRate,
-        services: services,
-        promos: promos
-    };
-    localStorage.setItem('adminData', JSON.stringify(dataToSave));
+// שומר נתונים לשרת
+async function saveDataToDb() {
+    const response = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            creditConversionRate,
+            services,
+            promos
+        })
+    });
+
+    if (!response.ok) throw new Error('Failed to save settings');
+    
+    saveDataToStorage();
+    return await response.json();
 }
 
-function loadAdminDashboard() {
-    loadDataFromStorage();
-    loadAdminStats();
-    loadUserManagement();
+// שומר נתונים לאחסון מקומי
+function saveDataToStorage() {
+    localStorage.setItem('adminData', JSON.stringify({
+        creditConversionRate,
+        services,
+        promos
+    }));
+}
+
+// טוען את לוח הבקרה של המנהל
+async function loadAdminDashboard() {
+    await initializeAdminData();
+    
+    const [statsData, usersData] = await Promise.all([
+        loadAdminStats(),
+        loadUserManagement()
+    ]);
+
     loadImageGenerationCostManagement();
     loadCreditConversion();
+
+    return { statsData, usersData };
 }
 
-function loadAdminStats() {
+// טוען סטטיסטיקות מנהל
+async function loadAdminStats() {
+    const response = await fetch('/api/admin/stats');
+    if (!response.ok) throw new Error('Failed to load admin stats');
+    
+    const stats = await response.json();
     const adminStats = document.getElementById('adminStats');
+    
     if (adminStats) {
         adminStats.innerHTML = `
-            <p>סה"כ משתמשים: ${users.length}</p>
-            <p>תמונות שנוצרו היום: ${calculateImagesCreatedToday()}</p>
-            <p>סה"כ קרדיטים במערכת: ${calculateTotalCredits()}</p>
+            <div class="stat-box">
+                <h3>סה"כ משתמשים</h3>
+                <p>${stats.totalUsers}</p>
+            </div>
+            <div class="stat-box">
+                <h3>תמונות שנוצרו היום</h3>
+                <p>${stats.imagesCreatedToday}</p>
+            </div>
+            <div class="stat-box">
+                <h3>סה"כ קרדיטים במערכת</h3>
+                <p>${stats.totalCredits}</p>
+            </div>
         `;
     }
+
+    return stats;
 }
 
-function calculateImagesCreatedToday() {
-    const today = new Date().toDateString();
-    return users.reduce((total, user) => {
-        return total + user.creditHistory.filter(entry => 
-            entry.action.includes('יצירת תמונה') && new Date(entry.date).toDateString() === today
-        ).length;
-    }, 0);
-}
-
-function calculateTotalCredits() {
-    return users.reduce((total, user) => total + user.credits, 0);
-}
-
-function loadUserManagement() {
+// טוען ניהול משתמשים
+async function loadUserManagement() {
+    const response = await fetch('/api/admin/users');
+    if (!response.ok) throw new Error('Failed to load users');
+    
+    const users = await response.json();
     const userManagement = document.getElementById('userManagement');
+    
     if (userManagement) {
-        let userRows = '';
-        users.forEach((user, index) => {
-            userRows += `
-                <tr>
-                    <td>${user.email}</td>
-                    <td>${user.credits}</td>
-                    <td><button onclick="editUser('${user.email}')">ערוך</button></td>
-                </tr>
-            `;
-        });
         userManagement.innerHTML = `
-            <table>
-                <tr><th>אימייל</th><th>קרדיטים</th><th>פעולות</th></tr>
-                ${userRows}
+            <table class="users-table">
+                <thead>
+                    <tr>
+                        <th>אימייל</th>
+                        <th>קרדיטים</th>
+                        <th>סטטוס</th>
+                        <th>פעולות</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${users.map(user => `
+                        <tr>
+                            <td>${user.email}</td>
+                            <td>${user.credits}</td>
+                            <td>${user.isActive ? 'פעיל' : 'לא פעיל'}</td>
+                            <td>
+                                <button onclick="editUser('${user.email}')">ערוך</button>
+                                <button onclick="toggleUserStatus('${user.email}', ${!user.isActive})">
+                                    ${user.isActive ? 'השבת' : 'הפעל'}
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
             </table>
         `;
     }
+
+    return users;
 }
 
-function editUser(email) {
-    const user = users.find(u => u.email === email);
-    if (user) {
-        const newCredits = prompt(`הזן מספר קרדיטים חדש עבור ${email}:`, user.credits);
-        if (newCredits !== null && !isNaN(newCredits)) {
-            user.credits = parseInt(newCredits);
-            saveUsersToLocalStorage();
-            loadUserManagement();
-            alert(`הקרדיטים של ${email} עודכנו ל-${newCredits}`);
-        }
-    } else {
-        alert(`משתמש עם האימייל ${email} לא נמצא`);
+// עריכת משתמש
+async function editUser(email) {
+    const newCredits = prompt(`הזן מספר קרדיטים חדש עבור ${email}:`);
+    if (newCredits === null || isNaN(newCredits)) return;
+
+    try {
+        const response = await fetch('/api/admin/updateUser', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email,
+                credits: parseInt(newCredits)
+            })
+        });
+
+        if (!response.ok) throw new Error('Failed to update user');
+
+        await loadUserManagement();
+        alert(`הקרדיטים של ${email} עודכנו בהצלחה`);
+    } catch (error) {
+        console.error('Error updating user:', error);
+        alert('שגיאה בעדכון המשתמש');
     }
 }
 
+// טוען ניהול עלויות יצירת תמונה
 function loadImageGenerationCostManagement() {
     const costManagement = document.getElementById('costManagement');
-    if (costManagement) {
-        costManagement.innerHTML = `
+    if (!costManagement) return;
+
+    costManagement.innerHTML = `
+        <div class="cost-management">
             <h3>ניהול שירותים ועלויות</h3>
             
             <div class="conversion-section">
                 <h4>הגדרות המרת קרדיטים</h4>
                 <div class="setting-group">
                     <label>קרדיטים לכל דולר:</label>
-                    <input type="number" 
-                           id="creditConversionRate" 
-                           value="${creditConversionRate}" 
-                           min="1">
+                    <input type="number" id="creditConversionRate" 
+                           value="${creditConversionRate}" min="1">
                     <button onclick="updateConversionRate()">עדכן שער המרה</button>
                 </div>
             </div>
@@ -152,93 +236,70 @@ function loadImageGenerationCostManagement() {
                                 <td>${service.name}</td>
                                 <td>${service.supplierCost}</td>
                                 <td>${service.customerCost}</td>
-                                <td>${service.customerCost * creditConversionRate}</td>
+                                <td>${Math.round(service.customerCost * creditConversionRate)}</td>
                                 <td>${service.isActive ? 'פעיל' : 'לא פעיל'}</td>
                                 <td>
                                     <button onclick="editService('${service.id}')">ערוך</button>
-                                    <button onclick="toggleService('${service.id}')">${service.isActive ? 'השבת' : 'הפעל'}</button>
+                                    <button onclick="toggleService('${service.id}')">
+                                        ${service.isActive ? 'השבת' : 'הפעל'}
+                                    </button>
                                 </td>
                             </tr>
                         `).join('')}
                     </tbody>
                 </table>
-                <button onclick="addNewService()" class="add-service-btn">הוסף שירות חדש</button>
+                <button class="add-service-btn" onclick="addNewService()">
+                    הוסף שירות חדש
+                </button>
             </div>
-        `;
-    }
+        </div>
+    `;
 }
 
-function editService(serviceId) {
-    const service = services.find(s => s.id === serviceId);
-    if (!service) return;
-
-    const newData = {
-        supplierCost: prompt('עלות ספק ($):', service.supplierCost),
-        customerCost: prompt('עלות לקוח ($):', service.customerCost),
-        name: prompt('שם השירות:', service.name)
-    };
-
-    if (newData.supplierCost && newData.customerCost && newData.name) {
-        service.supplierCost = parseFloat(newData.supplierCost);
-        service.customerCost = parseFloat(newData.customerCost);
-        service.name = newData.name;
-        saveDataToStorage();
-        loadImageGenerationCostManagement();
-        updateAllGenerateButtons();
-    }
-}
-
-function toggleService(serviceId) {
-    const service = services.find(s => s.id === serviceId);
-    if (service) {
-        service.isActive = !service.isActive;
-        saveDataToStorage();
-        loadImageGenerationCostManagement();
-        updateAllGenerateButtons();
-    }
-}
-
-function addNewService() {
-    const newService = {
-        id: 'service_' + Date.now(),
-        name: prompt('שם השירות:'),
-        supplierCost: parseFloat(prompt('עלות ספק ($):')),
-        customerCost: parseFloat(prompt('עלות לקוח ($):')),
-        isActive: true,
-        options: {}
-    };
-
-    if (newService.name && !isNaN(newService.supplierCost) && !isNaN(newService.customerCost)) {
-        services.push(newService);
-        saveDataToStorage();
-        loadImageGenerationCostManagement();
-        updateAllGenerateButtons();
-    } else {
-        alert('נתונים לא תקינים');
-    }
-}
-
-function updateConversionRate() {
+// עדכון שער המרת קרדיטים
+async function updateConversionRate() {
     const newRate = parseInt(document.getElementById('creditConversionRate').value);
-    if (!isNaN(newRate) && newRate > 0) {
+    if (isNaN(newRate) || newRate <= 0) {
+        alert('שער המרה לא תקין');
+        return;
+    }
+
+    try {
         creditConversionRate = newRate;
-        saveDataToStorage();
+        await saveDataToDb();
         loadImageGenerationCostManagement();
         updateAllGenerateButtons();
         alert('שער ההמרה עודכן בהצלחה');
-    } else {
-        alert('שער המרה לא תקין');
+    } catch (error) {
+        console.error('Error updating conversion rate:', error);
+        alert('שגיאה בעדכון שער ההמרה');
     }
 }
 
+// פונקציה מרכזית לחישוב עלות יצירת תמונה
+function getImageGenerationCost(size = '1024x1024') {
+    const service = services.find(s => s.options.size === size && s.isActive);
+    if (!service) return null;
+
+    return Math.round(service.customerCost * creditConversionRate);
+}
+
+// עדכון כל כפתורי היצירה
 function updateAllGenerateButtons() {
     const generateButtons = document.querySelectorAll('[id^="generateButton"]');
     generateButtons.forEach(button => {
         if (button) {
             const currentUser = getCurrentUser();
             const cost = getImageGenerationCost();
+            if (!cost) {
+                button.disabled = true;
+                button.textContent = 'השירות אינו זמין';
+                return;
+            }
+            
             if (currentUser) {
                 button.textContent = `צור (${cost} קרדיטים) | קרדיטים: ${currentUser.credits}`;
+                button.disabled = currentUser.credits < cost;
             } else {
                 button.textContent = `צור (${cost} קרדיטים)`;
             }
@@ -246,104 +307,12 @@ function updateAllGenerateButtons() {
     });
 }
 
-function loadCreditConversion() {
-    const conversionRate = document.getElementById('conversionRate');
-    if (conversionRate) conversionRate.value = creditConversionRate;
-    loadPromos();
-}
-
-function calculateCredits() {
-    const dollarAmount = document.getElementById('dollarAmount');
-    const calculatedCredits = document.getElementById('calculatedCredits');
-    const amount = parseFloat(dollarAmount.value);
-    if (!isNaN(amount) && amount > 0) {
-        let credits = amount * creditConversionRate;
-        const applicablePromo = promos.find(p => p.amount <= amount);
-        if (applicablePromo) {
-            credits = applicablePromo.credits;
-        }
-        calculatedCredits.textContent = credits;
-    } else {
-        alert('סכום לא תקין.');
-    }
-}
-
-function loadPromos() {
-    const promoList = document.getElementById('promoList');
-    if (promoList) {
-        promoList.innerHTML = '';
-        promos.forEach((promo, index) => {
-            const li = document.createElement('li');
-            li.textContent = `קנה ב-$${promo.amount}, קבל ${promo.credits} קרדיטים`;
-            const removeBtn = document.createElement('button');
-            removeBtn.textContent = 'הסר';
-            removeBtn.onclick = () => removePromo(index);
-            li.appendChild(removeBtn);
-            promoList.appendChild(li);
-        });
-    }
-}
-
-function addPromo() {
-    const promoAmount = document.getElementById('promoAmount');
-    const promoCredits = document.getElementById('promoCredits');
-    const amount = parseFloat(promoAmount.value);
-    const credits = parseInt(promoCredits.value);
-    if (!isNaN(amount) && !isNaN(credits) && amount > 0 && credits > 0) {
-        promos.push({ amount, credits });
-        loadPromos();
-        saveDataToStorage();
-        promoAmount.value = '';
-        promoCredits.value = '';
-    } else {
-        alert('נתוני מבצע לא תקינים.');
-    }
-}
-
-function removePromo(index) {
-    promos.splice(index, 1);
-    loadPromos();
-    saveDataToStorage();
-}
-
-function getImageGenerationCost(size = '1024x1024') {
-    const service = services.find(s => s.options.size === size && s.isActive);
-    if (service) {
-        return Math.round(service.customerCost * creditConversionRate);
-    }
-    // אם לא נמצא שירות פעיל, נחזיר ערך ברירת מחדל
-    const defaultService = services[0];
-    return Math.round(defaultService.customerCost * creditConversionRate);
-}
-
-function generateReport() {
-    const reportContainer = document.getElementById('reportContainer');
-    if (reportContainer) {
-        const totalCreditsUsed = users.reduce((total, user) => 
-            total + user.creditHistory.reduce((sum, entry) => sum + Math.abs(entry.amount), 0), 0);
-        
-        const imagesCreated = users.reduce((total, user) => 
-            total + user.creditHistory.filter(entry => entry.action.includes('יצירת תמונה')).length, 0);
-
-        reportContainer.innerHTML = `
-            <h4>דוח שימוש בקרדיטים</h4>
-            <p>סה"כ קרדיטים שנוצלו: ${totalCreditsUsed}</p>
-            <p>סה"כ תמונות שנוצרו: ${imagesCreated}</p>
-        `;
-    }
-}
-
 // חשיפת פונקציות גלובליות
 window.loadAdminDashboard = loadAdminDashboard;
 window.editUser = editUser;
 window.updateConversionRate = updateConversionRate;
-window.calculateCredits = calculateCredits;
-window.addPromo = addPromo;
-window.removePromo = removePromo;
-window.generateReport = generateReport;
 window.getImageGenerationCost = getImageGenerationCost;
-window.saveDataToStorage = saveDataToStorage;
+window.updateAllGenerateButtons = updateAllGenerateButtons;
 window.editService = editService;
 window.toggleService = toggleService;
 window.addNewService = addNewService;
-window.updateAllGenerateButtons = updateAllGenerateButtons;
