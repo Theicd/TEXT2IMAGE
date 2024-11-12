@@ -1,5 +1,5 @@
-import fetch from 'node-fetch';
-import { MongoClient } from 'mongodb';
+const fetch = require('node-fetch');
+const { MongoClient } = require('mongodb');
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
