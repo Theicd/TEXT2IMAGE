@@ -1,7 +1,7 @@
 // קובץ: openai-service.js
-// קובץ זה מבצע קריאה ל-funtion serverless שיוצרת תמונה באמצעות OpenAI
+// קובץ זה מבצע קריאה לפונקציית serverless שיוצרת תמונה באמצעות OpenAI
 
-async function generateImage(prompt) {
+async function generateImage(prompt, email) {
     console.log('התחלת תהליך יצירת תמונה');
 
     try {
@@ -11,7 +11,7 @@ async function generateImage(prompt) {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ prompt })
+            body: JSON.stringify({ prompt, email })
         });
 
         console.log('התקבלה תשובה מהשרת:', response.status);
@@ -44,13 +44,12 @@ async function generateImage(prompt) {
 // חשיפת הפונקציה לחלון הגלובלי
 window.generateImage = generateImage;
 
-
 // קובץ: api/generateImage.js
 // פונקציית serverless צד שרת לביצוע הקריאה ל-OpenAI
-import fetch from 'node-fetch';
-import { updateCredits } from './updateCredits';
+const fetch = require('node-fetch');
+const { MongoClient } = require('mongodb');
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
@@ -58,10 +57,19 @@ export default async function handler(req, res) {
     const { prompt, email } = req.body;
 
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    const MONGODB_URI = process.env.MONGODB_URI;
+
     if (!OPENAI_API_KEY) {
         console.error('Missing OpenAI API key');
         return res.status(500).json({ error: 'Missing OpenAI API key' });
     }
+
+    if (!MONGODB_URI) {
+        console.error('Missing MongoDB URI');
+        return res.status(500).json({ error: 'Missing MongoDB URI' });
+    }
+
+    let client;
 
     try {
         console.log('מתחילים קריאה ל-OpenAI API עם prompt:', prompt);
@@ -88,17 +96,32 @@ export default async function handler(req, res) {
 
         const data = await response.json();
 
-        // עדכון הקרדיטים של המשתמש לאחר יצירת התמונה
-        await updateCredits(email, -getImageGenerationCost());
+        // עדכון הקרדיטים של המשתמש במסד הנתונים
+        client = new MongoClient(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+        await client.connect();
+        const db = client.db('your_database_name'); // הכנס את שם מסד הנתונים שלך
+        const usersCollection = db.collection('users');
+
+        const creditCost = 10; // עלות הקרדיטים ליצירת תמונה
+        const user = await usersCollection.findOne({ email: email });
+
+        if (!user) {
+            throw new Error('User not found');
+        }
+
+        if (user.credits < creditCost) {
+            throw new Error('Not enough credits');
+        }
+
+        await usersCollection.updateOne({ email: email }, { $inc: { credits: -creditCost } });
 
         res.status(200).json(data);
     } catch (error) {
         console.error('שגיאה בקריאה ל-OpenAI:', error);
         res.status(500).json({ error: error.message });
+    } finally {
+        if (client) {
+            await client.close();
+        }
     }
-}
-
-function getImageGenerationCost() {
-    // עלות יצירת תמונה - ניתן להתאים לפי הצורך
-    return 10;
-}
+};
