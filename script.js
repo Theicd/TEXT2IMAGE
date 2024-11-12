@@ -26,6 +26,48 @@ console.log = function() {
     debugElement.scrollTop = debugElement.scrollHeight;
 };
 
+async function registerUser(email, password) {
+    try {
+        const response = await fetch('/api/registerUser', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email, password })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to register user');
+        }
+
+        const data = await response.json();
+        console.log('User registered successfully:', data);
+    } catch (error) {
+        console.error('Error registering user:', error);
+    }
+}
+
+async function updateCredits(email, amount) {
+    try {
+        const response = await fetch('/api/updateCredits', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email, amount })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to update credits');
+        }
+
+        const data = await response.json();
+        console.log('Credits updated successfully:', data);
+    } catch (error) {
+        console.error('Error updating credits:', error);
+    }
+}
+
 function getImageGenerationCost() {
     const savedData = localStorage.getItem('adminData');
     if (savedData) {
@@ -108,29 +150,26 @@ async function generateImage() {
             console.log('התקבלה תמונה:', imageUrl);
 
             // חיוב הקרדיטים רק לאחר שהתמונה נוצרה בהצלחה
-            if (updateUserCredits(-cost)) {
-                const creditAction = `יצירת תמונה: ${prompt}`;
-                if (logCreditUsage(creditAction, -cost, true)) {
-                    // יצירת אלמנטים חדשים לתמונה
-                    const imageCard = document.createElement('div');
-                    imageCard.className = 'image-card';
+            await updateCredits(currentUser.email, -cost);
 
-                    const img = document.createElement('img');
-                    img.src = imageUrl;
-                    img.alt = prompt;
+            // יצירת אלמנטים חדשים לתמונה
+            const imageCard = document.createElement('div');
+            imageCard.className = 'image-card';
 
-                    const p = document.createElement('p');
-                    p.textContent = prompt;
+            const img = document.createElement('img');
+            img.src = imageUrl;
+            img.alt = prompt;
 
-                    imageCard.appendChild(img);
-                    imageCard.appendChild(p);
+            const p = document.createElement('p');
+            p.textContent = prompt;
 
-                    imageGrid.prepend(imageCard);
-                    promptInput.value = '';
-                    updateGenerateButtonText(); // עדכון הכפתור אחרי השימוש
-                    alert('התמונה נוצרה בהצלחה!');
-                }
-            }
+            imageCard.appendChild(img);
+            imageCard.appendChild(p);
+
+            imageGrid.prepend(imageCard);
+            promptInput.value = '';
+            updateGenerateButtonText(); // עדכון הכפתור אחרי השימוש
+            alert('התמונה נוצרה בהצלחה!');
         } else {
             throw new Error('לא התקבל URL לתמונה');
         }
