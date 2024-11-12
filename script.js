@@ -1,292 +1,298 @@
-// Override console.log to also display in the UI
-const originalConsoleLog = console.log;
-console.log = function() {
-    originalConsoleLog.apply(console, arguments);
-    
-    let debugElement = document.getElementById('debug-output');
-    if (!debugElement) {
-        debugElement = document.createElement('div');
-        debugElement.id = 'debug-output';
-        debugElement.style.position = 'fixed';
-        debugElement.style.bottom = '0';
-        debugElement.style.left = '0';
-        debugElement.style.width = '100%';
-        debugElement.style.maxHeight = '200px';
-        debugElement.style.overflowY = 'scroll';
-        debugElement.style.backgroundColor = 'rgba(0,0,0,0.8)';
-        debugElement.style.color = 'white';
-        debugElement.style.fontFamily = 'monospace';
-        debugElement.style.padding = '10px';
-        debugElement.style.zIndex = '9999';
-        document.body.appendChild(debugElement);
+// script.js
+class ImageGenerator {
+    constructor() {
+        this.imageGrid = document.getElementById('imageGrid');
+        this.promptInput = document.getElementById('promptInput');
+        this.generateButton = document.getElementById('generateButton');
+        this.loadingIndicator = null;
+        this.setupEventListeners();
     }
-    
-    const logMessage = Array.from(arguments).join(' ');
-    debugElement.innerHTML += `<div>${new Date().toISOString()} - ${logMessage}</div>`;
-    debugElement.scrollTop = debugElement.scrollHeight;
-};
 
-async function registerUser(email, password) {
-    try {
-        const response = await fetch('/api/registerUser', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ email, password })
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to register user');
+    setupEventListeners() {
+        if (this.generateButton) {
+            this.generateButton.addEventListener('click', () => this.generateImage());
         }
 
-        const data = await response.json();
-        console.log('User registered successfully:', data);
-    } catch (error) {
-        console.error('Error registering user:', error);
+        // מאזין לשינויים בגודל התמונה
+        const sizeSelector = document.getElementById('imageSize');
+        if (sizeSelector) {
+            sizeSelector.addEventListener('change', () => this.updateGenerateButtonText());
+        }
     }
-}
 
-async function updateCredits(email, amount) {
-    try {
-        const response = await fetch('/api/updateCredits', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ email, amount })
-        });
+    showLoading() {
+        this.loadingIndicator = document.createElement('div');
+        this.loadingIndicator.className = 'loading-indicator';
+        this.loadingIndicator.innerHTML = `
+            <div class="spinner"></div>
+            <p>מייצר תמונה...</p>
+        `;
+        this.generateButton.parentNode.insertBefore(
+            this.loadingIndicator,
+            this.generateButton.nextSibling
+        );
+        this.generateButton.disabled = true;
+    }
 
-        if (!response.ok) {
-            throw new Error('Failed to update credits');
+    hideLoading() {
+        if (this.loadingIndicator && this.loadingIndicator.parentNode) {
+            this.loadingIndicator.parentNode.removeChild(this.loadingIndicator);
+        }
+        this.generateButton.disabled = false;
+    }
+
+    async generateImage() {
+        if (!isUserLoggedIn()) {
+            alert('עליך להתחבר כדי ליצור תמונות');
+            openAuthModal('login');
+            return;
         }
 
-        const data = await response.json();
-        console.log('Credits updated successfully:', data);
-    } catch (error) {
-        console.error('Error updating credits:', error);
-    }
-}
-
-function getImageGenerationCost() {
-    const savedData = localStorage.getItem('adminData');
-    if (savedData) {
-        const data = JSON.parse(savedData);
-        return Math.round((0.16 * data.creditConversionRate)); // 0.16 דולר * שער המרה
-    }
-    return 10; // ברירת מחדל
-}
-
-async function generateImage() {
-    console.log('התחלת תהליך יצירת תמונה');
-    if (!isUserLoggedIn()) {
-        console.log('משתמש לא מחובר');
-        alert('עליך להתחבר כדי ליצור תמונות');
-        openAuthModal('login');
-        return;
-    }
-
-    const promptInput = document.getElementById('promptInput');
-    const generateButton = document.getElementById('generateButton');
-    const imageGrid = document.getElementById('imageGrid');
-
-    if (!promptInput || !generateButton || !imageGrid) {
-        console.error('אחד או יותר מהאלמנטים הנדרשים חסרים בדף');
-        alert('אירעה שגיאה בטעינת הדף. אנא רענן את הדף ונסה שוב.');
-        return;
-    }
-
-    const prompt = promptInput.value.trim();
-    if (prompt === '') {
-        console.log('תיאור תמונה ריק');
-        alert('אנא הזן תיאור לתמונה');
-        return;
-    }
-
-    const currentUser = getCurrentUser();
-    if (!currentUser) {
-        console.error('לא ניתן לקבל את פרטי המשתמש הנוכחי');
-        alert('אירעה שגיאה באימות המשתמש. אנא התנתק והתחבר מחדש.');
-        return;
-    }
-    console.log('משתמש נוכחי:', currentUser.email);
-
-    const cost = getImageGenerationCost();
-    console.log('עלות יצירת תמונה:', cost);
-    if (currentUser.credits < cost) {
-        console.log('אין מספיק קרדיטים');
-        alert('אין מספיק קרדיטים. אנא רכוש קרדיטים נוספים.');
-        return;
-    }
-
-    // הוספת אינדיקטור טעינה
-    const loadingIndicator = document.createElement('div');
-    loadingIndicator.textContent = 'מייצר תמונה...';
-    loadingIndicator.style.color = 'white';
-    loadingIndicator.style.marginTop = '10px';
-    generateButton.parentNode.insertBefore(loadingIndicator, generateButton.nextSibling);
-    generateButton.disabled = true;
-
-    try {
-        console.log('מתחיל ליצור תמונה');
-
-        // קריאה לפונקציית serverless שנמצאת ב-Vercel (api/generateImage)
-        console.log('שולח בקשה ל-OpenAI דרך פונקציית צד שרת');
-        const response = await fetch('/api/generateImage', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ prompt })
-        });
-
-        if (!response.ok) {
-            throw new Error('שגיאה בקריאה לפונקציה צד שרת');
+        const prompt = this.promptInput.value.trim();
+        if (!prompt) {
+            alert('אנא הזן תיאור לתמונה');
+            return;
         }
 
-        const data = await response.json();
-        if (data.data && data.data[0] && data.data[0].url) {
-            const imageUrl = data.data[0].url;
-            console.log('התקבלה תמונה:', imageUrl);
-
-            // חיוב הקרדיטים רק לאחר שהתמונה נוצרה בהצלחה
-            await updateCredits(currentUser.email, -cost);
-
-            // יצירת אלמנטים חדשים לתמונה
-            const imageCard = document.createElement('div');
-            imageCard.className = 'image-card';
-
-            const img = document.createElement('img');
-            img.src = imageUrl;
-            img.alt = prompt;
-
-            const p = document.createElement('p');
-            p.textContent = prompt;
-
-            imageCard.appendChild(img);
-            imageCard.appendChild(p);
-
-            imageGrid.prepend(imageCard);
-            promptInput.value = '';
-            updateGenerateButtonText(); // עדכון הכפתור אחרי השימוש
-            alert('התמונה נוצרה בהצלחה!');
-        } else {
-            throw new Error('לא התקבל URL לתמונה');
-        }
-    } catch (error) {
-        console.error('שגיאה ביצירת תמונה:', error);
-        alert('אירעה שגיאה ביצירת התמונה: ' + error.message);
-    } finally {
-        // הסרת אינדיקטור הטעינה
-        if (loadingIndicator && loadingIndicator.parentNode) {
-            loadingIndicator.parentNode.removeChild(loadingIndicator);
-        }
-        generateButton.disabled = false;
-    }
-}
-
-function updateGenerateButtonText() {
-    const generateButton = document.getElementById('generateButton');
-    const cost = getImageGenerationCost();
-    if (generateButton && isUserLoggedIn()) {
+        const size = document.getElementById('imageSize')?.value || '1024x1024';
         const currentUser = getCurrentUser();
-        generateButton.textContent = `צור (${cost} קרדיטים) | קרדיטים: ${currentUser.credits}`;
-    } else if (generateButton) {
-        generateButton.textContent = `צור (${cost} קרדיטים)`;
-    }
-}
+        const cost = getImageGenerationCost(size);
 
-function loadDataFromStorage() {
-    // טעינת נתוני המערכת מה-localStorage
-    const savedData = localStorage.getItem('adminData');
-    if (savedData) {
-        console.log('נטענו נתוני מערכת');
-        updateGenerateButtonText(); // עדכון הכפתור בטעינה
-    }
-}
-
-function openDashboard() {
-    const homePage = document.getElementById('homePage');
-    const userDashboard = document.getElementById('userDashboard');
-    const adminDashboard = document.getElementById('adminDashboard');
-
-    if (homePage) homePage.style.display = 'none';
-    
-    if (isUserAdmin()) {
-        if (adminDashboard) {
-            adminDashboard.style.display = 'block';
-            loadAdminDashboard();
+        if (!cost) {
+            alert('השירות אינו זמין כרגע');
+            return;
         }
-        if (userDashboard) userDashboard.style.display = 'none';
+
+        if (currentUser.credits < cost) {
+            alert('אין מספיק קרדיטים. אנא רכוש קרדיטים נוספים.');
+            this.showCreditPurchaseDialog(cost - currentUser.credits);
+            return;
+        }
+
+        this.showLoading();
+
+        try {
+            const response = await fetch('/api/generateImage', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${currentUser.token}`
+                },
+                body: JSON.stringify({
+                    prompt,
+                    email: currentUser.email,
+                    size
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to generate image');
+            }
+
+            const data = await response.json();
+            
+            // עדכון ממשק המשתמש
+            this.addImageToGrid(data.data[0].url, prompt);
+            this.promptInput.value = '';
+            
+            // עדכון קרדיטים
+            await this.updateUserCredits(data.credits.remaining);
+            
+            this.showSuccessMessage('התמונה נוצרה בהצלחה!');
+
+        } catch (error) {
+            console.error('Error generating image:', error);
+            this.showErrorMessage(error.message);
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    addImageToGrid(imageUrl, prompt) {
+        const imageCard = document.createElement('div');
+        imageCard.className = 'image-card';
+
+        imageCard.innerHTML = `
+            <img src="${imageUrl}" alt="${prompt}" loading="lazy">
+            <p>${prompt}</p>
+            <div class="image-actions">
+                <button onclick="downloadImage('${imageUrl}')">
+                    <i class="fas fa-download"></i>
+                </button>
+                <button onclick="shareImage('${imageUrl}', '${prompt}')">
+                    <i class="fas fa-share"></i>
+                </button>
+            </div>
+        `;
+
+        if (this.imageGrid.firstChild) {
+            this.imageGrid.insertBefore(imageCard, this.imageGrid.firstChild);
+        } else {
+            this.imageGrid.appendChild(imageCard);
+        }
+    }
+
+    async updateUserCredits(newAmount) {
+        const currentUser = getCurrentUser();
+        currentUser.credits = newAmount;
+        saveUserToLocalStorage(currentUser);
+        this.updateGenerateButtonText();
+        
+        const creditDisplay = document.getElementById('creditDisplay');
+        if (creditDisplay) {
+            creditDisplay.textContent = newAmount;
+        }
+    }
+
+    updateGenerateButtonText() {
+        const size = document.getElementById('imageSize')?.value || '1024x1024';
+        const cost = getImageGenerationCost(size);
+        const currentUser = getCurrentUser();
+
+        if (this.generateButton) {
+            if (!cost) {
+                this.generateButton.disabled = true;
+                this.generateButton.textContent = 'השירות אינו זמין';
+                return;
+            }
+
+            if (currentUser) {
+                this.generateButton.textContent = `צור (${cost} קרדיטים) | נותרו: ${currentUser.credits}`;
+                this.generateButton.disabled = currentUser.credits < cost;
+            } else {
+                this.generateButton.textContent = `צור (${cost} קרדיטים)`;
+            }
+        }
+    }
+
+    showCreditPurchaseDialog(suggestedAmount) {
+        const dialog = document.createElement('div');
+        dialog.className = 'credit-purchase-dialog';
+        dialog.innerHTML = `
+            <h3>רכישת קרדיטים</h3>
+            <p>נדרשים לפחות ${suggestedAmount} קרדיטים נוספים</p>
+            <div class="purchase-options">
+                ${this.generatePurchaseOptions(suggestedAmount)}
+            </div>
+            <button onclick="closePurchaseDialog()">סגור</button>
+        `;
+        document.body.appendChild(dialog);
+    }
+
+    generatePurchaseOptions(suggestedAmount) {
+        const options = [
+            { amount: Math.ceil(suggestedAmount / 10) * 10, price: 5 },
+            { amount: Math.ceil(suggestedAmount / 10) * 20, price: 9 },
+            { amount: Math.ceil(suggestedAmount / 10) * 50, price: 20 }
+        ];
+
+        return options.map(option => `
+            <div class="purchase-option" onclick="purchaseCredits(${option.amount}, ${option.price})">
+                <h4>${option.amount} קרדיטים</h4>
+                <p>$${option.price}</p>
+                ${option.amount >= suggestedAmount ? '<span class="recommended">מומלץ</span>' : ''}
+            </div>
+        `).join('');
+    }
+
+    showSuccessMessage(message) {
+        const toast = document.createElement('div');
+        toast.className = 'toast success';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+
+    showErrorMessage(message) {
+        const toast = document.createElement('div');
+        toast.className = 'toast error';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 5000);
+    }
+}
+
+// יצירת מופע של מחולל התמונות
+const imageGenerator = new ImageGenerator();
+
+// פונקציות עזר גלובליות
+async function downloadImage(url) {
+    try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'generated-image.png';
+        link.click();
+    } catch (error) {
+        console.error('Error downloading image:', error);
+        imageGenerator.showErrorMessage('שגיאה בהורדת התמונה');
+    }
+}
+
+async function shareImage(url, prompt) {
+    if (navigator.share) {
+        try {
+            await navigator.share({
+                title: 'תמונה שנוצרה ב-TextToImg',
+                text: prompt,
+                url: url
+            });
+        } catch (error) {
+            console.error('Error sharing image:', error);
+        }
     } else {
-        if (userDashboard) {
-            userDashboard.style.display = 'block';
-            loadUserDashboard();
+        // נעתיק את הקישור ללוח
+        navigator.clipboard.writeText(url);
+        imageGenerator.showSuccessMessage('הקישור הועתק ללוח');
+    }
+}
+
+async function purchaseCredits(amount, price) {
+    // פתיחת חלון תשלום
+    try {
+        const response = await fetch('/api/credits/purchase', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${getCurrentUser().token}`
+            },
+            body: JSON.stringify({
+                email: getCurrentUser().email,
+                amount,
+                price
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to process payment');
         }
-        if (adminDashboard) adminDashboard.style.display = 'none';
+
+        const data = await response.json();
+        imageGenerator.updateUserCredits(data.user.credits);
+        imageGenerator.showSuccessMessage(`נרכשו ${amount} קרדיטים בהצלחה!`);
+        
+        const dialog = document.querySelector('.credit-purchase-dialog');
+        if (dialog) {
+            dialog.remove();
+        }
+
+    } catch (error) {
+        console.error('Error purchasing credits:', error);
+        imageGenerator.showErrorMessage('שגיאה ברכישת הקרדיטים');
     }
 }
 
-function returnToHomePage() {
-    const homePage = document.getElementById('homePage');
-    const userDashboard = document.getElementById('userDashboard');
-    const adminDashboard = document.getElementById('adminDashboard');
-
-    if (homePage) homePage.style.display = 'block';
-    if (userDashboard) userDashboard.style.display = 'none';
-    if (adminDashboard) adminDashboard.style.display = 'none';
-    
-    // עדכון כפתור היצירה בחזרה לדף הבית
-    updateGenerateButtonText();
+function closePurchaseDialog() {
+    const dialog = document.querySelector('.credit-purchase-dialog');
+    if (dialog) {
+        dialog.remove();
+    }
 }
-
-// אתחול המערכת בטעינת הדף
-document.addEventListener('DOMContentLoaded', function() {
-    // אתחול ניהול משתמשים
-    initializeUserManagement();
-
-    // אתחול נתוני המערכת
-    loadDataFromStorage();
-
-    // הגדרת אירועי לחיצה
-    const generateButton = document.getElementById('generateButton');
-    const authBtn = document.getElementById('authBtn');
-    const logoutBtn = document.getElementById('logoutBtn');
-    const dashboardBtn = document.getElementById('dashboardBtn');
-    const homeButtons = document.querySelectorAll('.home-button');
-
-    // הגדרת מאזיני אירועים
-    if (generateButton) {
-        generateButton.addEventListener('click', generateImage);
-    }
-
-    if (authBtn) {
-        authBtn.addEventListener('click', () => openAuthModal('register'));
-    }
-
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', logout);
-    }
-
-    if (dashboardBtn) {
-        dashboardBtn.addEventListener('click', openDashboard);
-    }
-
-    // מאזין לחיצה על כפתורי "חזרה לדף הבית"
-    homeButtons.forEach(button => {
-        button.addEventListener('click', returnToHomePage);
-    });
-
-    // עדכון כפתור היצירה עם העלות הנוכחית
-    updateGenerateButtonText();
-
-    // אתחול מצב התחברות ראשוני
-    checkInitialAuthState();
-});
 
 // חשיפת פונקציות גלובליות
-window.returnToHomePage = returnToHomePage;
-window.openDashboard = openDashboard;
-window.updateGenerateButtonText = updateGenerateButtonText;
-window.generateImage = generateImage;
-window.getImageGenerationCost = getImageGenerationCost;
+window.downloadImage = downloadImage;
+window.shareImage = shareImage;
+window.purchaseCredits = purchaseCredits;
+window.closePurchaseDialog = closePurchaseDialog;
