@@ -76,4 +76,4 @@ module.exports = async function handler(req, res) {
             await client.close();
         }
     }
-}
+};
