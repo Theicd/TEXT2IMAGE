@@ -37,7 +37,7 @@
             <p>צור תמונה באמצעות בינה מלאכותית על ידי תיאור מה שברצונך לראות. כל התמונות מפורסמות באופן ציבורי כברירת מחדל.</p>
             <div class="input-container">
                 <input type="text" id="promptInput" placeholder="תאר את התמונה שברצונך ליצור...">
-                <button id="generateButton">צור</button>
+                <button id="generateButton" onclick="generateImage()">צור</button>
             </div>
             <div id="imageGrid" class="image-grid"></div>
         </div>
@@ -114,7 +114,7 @@
                     <button type="submit">הרשם</button>
                 </form>
                 <div class="social-auth">
-                    <button id="googleAuth">
+                    <button id="googleAuth" onclick="handleGoogleLogin()">
                         <img src="https://www.google.com/favicon.ico" alt="Google Logo">
                         התחבר עם Google
                     </button>
