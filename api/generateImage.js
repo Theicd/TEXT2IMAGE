@@ -21,6 +21,8 @@ module.exports = async function handler(req, res) {
         return res.status(500).json({ error: 'Missing MongoDB URI' });
     }
 
+    let client;
+
     try {
         console.log('מתחילים קריאה ל-OpenAI API עם prompt:', prompt);
 
@@ -47,7 +49,7 @@ module.exports = async function handler(req, res) {
         const data = await response.json();
 
         // עדכון הקרדיטים של המשתמש במסד הנתונים
-        const client = new MongoClient(MONGODB_URI);
+        client = new MongoClient(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
         await client.connect();
         const db = client.db('your_database_name'); // הכנס את שם מסד הנתונים שלך
         const usersCollection = db.collection('users');
@@ -64,11 +66,14 @@ module.exports = async function handler(req, res) {
         }
 
         await usersCollection.updateOne({ email: email }, { $inc: { credits: -creditCost } });
-        client.close();
 
         res.status(200).json(data);
     } catch (error) {
         console.error('שגיאה בקריאה ל-OpenAI:', error);
         res.status(500).json({ error: error.message });
+    } finally {
+        if (client) {
+            await client.close();
+        }
     }
 }
