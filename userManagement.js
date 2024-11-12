@@ -35,6 +35,7 @@ function setupAuthListeners() {
     if (authForm) authForm.addEventListener('submit', handleRegistration);
 }
 
+// UI Functions - לא משתנות
 function openAuthModal(type) {
     const authModal = document.getElementById('authModal');
     if (authModal) authModal.style.display = "block";
@@ -65,14 +66,15 @@ function switchAuthTab(type) {
     }
 }
 
-function handleLogin(e) {
+// Authentication Handlers
+async function handleLogin(e) {
     e.preventDefault();
     const email = document.getElementById('loginEmailInput').value;
     const password = document.getElementById('loginPasswordInput').value;
-    loginUser(email, password);
+    await loginUser(email, password);
 }
 
-function handleRegistration(e) {
+async function handleRegistration(e) {
     e.preventDefault();
     const email = document.getElementById('emailInput').value;
     const password = document.getElementById('passwordInput').value;
@@ -93,43 +95,57 @@ function handleRegistration(e) {
         return;
     }
 
-    registerUser(email, password);
+    await registerUser(email, password);
 }
+// Core Authentication Functions
+async function registerUser(email, password) {
+    try {
+        const response = await fetch('/api/registerUser', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email, password })
+        });
 
-function validateEmail(email) {
-    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return re.test(email);
-}
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error registering user');
+        }
 
-function registerUser(email, password) {
-    if (users.some(user => user.email === email)) {
-        alert('משתמש עם כתובת אימייל זו כבר קיים');
-        return;
+        // רישום מוצלח - ביצוע התחברות
+        await loginUser(email, password);
+        
+    } catch (error) {
+        console.error('Error registering user:', error);
+        alert(error.message);
     }
-
-    const newUser = {
-        email: email,
-        password: password,
-        isAdmin: false,
-        credits: 100,
-        creditHistory: []
-    };
-
-    users.push(newUser);
-    saveUsersToLocalStorage();
-    loginUser(email, password);
 }
 
-function loginUser(email, password) {
-    const user = users.find(u => u.email === email && u.password === password);
-    if (user) {
+async function loginUser(email, password) {
+    try {
+        const response = await fetch('/api/loginUser', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email, password })
+        });
+
+        if (!response.ok) {
+            throw new Error('אימייל או סיסמה שגויים');
+        }
+
+        const userData = await response.json();
+        
         isLoggedIn = true;
-        currentUser = user;
+        currentUser = userData;
         updateUIAfterAuth();
         closeAuthModal();
         saveUserToLocalStorage();
-    } else {
-        alert('אימייל או סיסמה שגויים');
+        
+    } catch (error) {
+        alert(error.message);
     }
 }
 
@@ -140,6 +156,7 @@ function logout() {
     localStorage.removeItem('currentUser');
 }
 
+// UI Update Functions - לא משתנות
 function updateUIAfterAuth() {
     const authBtn = document.getElementById('authBtn');
     const logoutBtn = document.getElementById('logoutBtn');
@@ -163,11 +180,7 @@ function updateUIAfterAuth() {
         if (userDashboard) userDashboard.style.display = 'none';
         if (adminDashboard) adminDashboard.style.display = 'none';
         
-        const generateButton = document.getElementById('generateButton');
-        if (generateButton) {
-            const cost = getImageGenerationCost();
-            generateButton.textContent = `צור (${cost}₪) | קרדיטים: ${currentUser.credits}`;
-        }
+        updateGenerateButtonText();
     } else {
         if (authBtn) authBtn.style.display = 'inline-block';
         if (logoutBtn) logoutBtn.style.display = 'none';
@@ -177,226 +190,3 @@ function updateUIAfterAuth() {
         if (adminDashboard) adminDashboard.style.display = 'none';
     }
 }
-
-function initializeCreditHistoryTable() {
-    const userDashboard = document.getElementById('userDashboard');
-    if (!userDashboard) return;
-
-    // ניקוי הטבלה הקיימת אם יש
-    const existingTable = document.getElementById('creditHistoryTable');
-    if (existingTable) {
-        existingTable.remove();
-    }
-
-    // יצירת טבלה חדשה
-    const table = document.createElement('table');
-    table.id = 'creditHistoryTable';
-    
-    // יצירת כותרת הטבלה
-    const thead = document.createElement('thead');
-    const headerRow = document.createElement('tr');
-    ['תאריך', 'פעולה', 'קרדיטים', 'יתרה'].forEach(text => {
-        const th = document.createElement('th');
-        th.textContent = text;
-        headerRow.appendChild(th);
-    });
-    thead.appendChild(headerRow);
-    table.appendChild(thead);
-
-    // יצירת גוף הטבלה
-    const tbody = document.createElement('tbody');
-    tbody.id = 'creditHistoryBody';
-    table.appendChild(tbody);
-
-    // הוספת הטבלה לדשבורד
-    const historySection = document.createElement('div');
-    historySection.className = 'history-section';
-    historySection.innerHTML = '<h3>היסטוריית שימוש בקרדיטים:</h3>';
-    historySection.appendChild(table);
-    userDashboard.appendChild(historySection);
-}
-
-function logCreditUsage(action, amount, forceUpdate = false) {
-    if (currentUser) {
-        try {
-            // בדיקה והכנת מערך ההיסטוריה
-            if (!currentUser.creditHistory) {
-                currentUser.creditHistory = [];
-            }
-
-            // יצירת רשומה חדשה
-            const entry = {
-                date: new Date().toLocaleString('he-IL'),
-                action: action,
-                amount: amount,
-                balance: currentUser.credits
-            };
-
-            // הוספת הרשומה בתחילת המערך
-            currentUser.creditHistory.unshift(entry);
-
-            // עדכון המשתמש במערך המשתמשים
-            const userIndex = users.findIndex(u => u.email === currentUser.email);
-            if (userIndex !== -1) {
-                users[userIndex] = currentUser;
-                saveUsersToLocalStorage();
-            }
-
-            // שמירת המשתמש הנוכחי
-            saveUserToLocalStorage();
-
-            // עדכון התצוגה רק אם נדרש
-            if (forceUpdate) {
-                loadCreditHistory();
-            }
-
-            console.log('נרשמה פעולת קרדיט:', action, amount);
-            return true;
-        } catch (error) {
-            console.error('שגיאה ברישום פעולת קרדיט:', error);
-            return false;
-        }
-    }
-    return false;
-}
-
-function loadCreditHistory() {
-    const tbody = document.getElementById('creditHistoryBody');
-    if (!tbody || !currentUser || !currentUser.creditHistory) {
-        console.log('לא ניתן לטעון היסטוריה - נתונים חסרים');
-        return;
-    }
-
-    // ניקוי הטבלה הקיימת
-    tbody.innerHTML = '';
-    
-    // הוספת כל הרשומות
-    currentUser.creditHistory.forEach(entry => {
-        const row = document.createElement('tr');
-        
-        // תאריך
-        const dateCell = document.createElement('td');
-        dateCell.textContent = entry.date;
-        row.appendChild(dateCell);
-        
-        // פעולה
-        const actionCell = document.createElement('td');
-        actionCell.textContent = entry.action;
-        row.appendChild(actionCell);
-        
-        // סכום
-        const amountCell = document.createElement('td');
-        amountCell.textContent = entry.amount;
-        amountCell.style.color = entry.amount < 0 ? 'red' : 'green';
-        row.appendChild(amountCell);
-        
-        // יתרה
-        const balanceCell = document.createElement('td');
-        balanceCell.textContent = entry.balance;
-        row.appendChild(balanceCell);
-        
-        tbody.appendChild(row);
-    });
-}
-
-function updateUserCredits(amount) {
-    if (currentUser) {
-        // שמירת היתרה הקודמת
-        const previousBalance = currentUser.credits;
-        
-        // עדכון הקרדיטים
-        currentUser.credits += amount;
-        console.log('עדכון קרדיטים:', amount, 'יתרה חדשה:', currentUser.credits);
-        
-        // עדכון המשתמש במערך המשתמשים
-        const userIndex = users.findIndex(u => u.email === currentUser.email);
-        if (userIndex !== -1) {
-            users[userIndex] = currentUser;
-            saveUsersToLocalStorage();
-        }
-        
-        // שמירת המשתמש הנוכחי
-        saveUserToLocalStorage();
-        
-        // עדכון התצוגה
-        updateUserCreditsDisplay();
-        
-        return true;
-    }
-    return false;
-}
-
-function updateUserCreditsDisplay() {
-    // עדכון תצוגת הקרדיטים בלוח הבקרה
-    const creditBalance = document.getElementById('creditBalance');
-    if (creditBalance) {
-        creditBalance.textContent = currentUser.credits;
-    }
-    
-    // עדכון תצוגת הקרדיטים בכפתור היצירה
-    const generateButton = document.getElementById('generateButton');
-    if (generateButton) {
-        const cost = getImageGenerationCost();
-        generateButton.textContent = `צור (${cost}₪) | קרדיטים: ${currentUser.credits}`;
-    }
-}
-
-function loadUserDashboard() {
-    console.log('טוען לוח בקרה למשתמש');
-    const homePage = document.getElementById('homePage');
-    const userDashboard = document.getElementById('userDashboard');
-    const adminDashboard = document.getElementById('adminDashboard');
-
-    if (homePage) homePage.style.display = 'none';
-    if (userDashboard) {
-        userDashboard.style.display = 'block';
-        // אתחול טבלת ההיסטוריה
-        initializeCreditHistoryTable();
-    }
-    if (adminDashboard) adminDashboard.style.display = 'none';
-
-    if (currentUser) {
-        updateUserCreditsDisplay();
-        loadCreditHistory();
-    }
-}
-
-function checkInitialAuthState() {
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-        currentUser = JSON.parse(savedUser);
-        isLoggedIn = true;
-        updateUIAfterAuth();
-    }
-}
-
-function saveUserToLocalStorage() {
-    localStorage.setItem('currentUser', JSON.stringify(currentUser));
-}
-
-function getCurrentUser() {
-    return currentUser;
-}
-
-function isUserLoggedIn() {
-    return isLoggedIn;
-}
-
-function isUserAdmin() {
-    return isLoggedIn && currentUser.isAdmin;
-}
-
-// חשיפת פונקציות נחוצות באופן גלובלי
-window.initializeUserManagement = initializeUserManagement;
-window.openAuthModal = openAuthModal;
-window.closeAuthModal = closeAuthModal;
-window.switchAuthTab = switchAuthTab;
-window.handleLogin = handleLogin;
-window.handleRegistration = handleRegistration;
-window.logout = logout;
-window.getCurrentUser = getCurrentUser;
-window.isUserLoggedIn = isUserLoggedIn;
-window.isUserAdmin = isUserAdmin;
-window.updateUserCredits = updateUserCredits;
-window.logCreditUsage = logCreditUsage;
-window.loadUserDashboard = loadUserDashboard;
