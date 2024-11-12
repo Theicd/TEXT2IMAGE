@@ -48,13 +48,14 @@ window.generateImage = generateImage;
 // קובץ: api/generateImage.js
 // פונקציית serverless צד שרת לביצוע הקריאה ל-OpenAI
 import fetch from 'node-fetch';
+import { updateCredits } from './updateCredits';
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
-    const { prompt } = req.body;
+    const { prompt, email } = req.body;
 
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
     if (!OPENAI_API_KEY) {
@@ -86,9 +87,18 @@ export default async function handler(req, res) {
         }
 
         const data = await response.json();
+
+        // עדכון הקרדיטים של המשתמש לאחר יצירת התמונה
+        await updateCredits(email, -getImageGenerationCost());
+
         res.status(200).json(data);
     } catch (error) {
         console.error('שגיאה בקריאה ל-OpenAI:', error);
         res.status(500).json({ error: error.message });
     }
+}
+
+function getImageGenerationCost() {
+    // עלות יצירת תמונה - ניתן להתאים לפי הצורך
+    return 10;
 }
